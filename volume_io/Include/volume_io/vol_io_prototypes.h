@@ -616,6 +616,7 @@ VIOAPI  void  free_memory_5d(
     void   ******ptr
     _ALLOC_SOURCE_LINE_ARG_DEF );
 
+#if 0
 VIOAPI  size_t  get_total_memory_alloced( void );
 
 VIOAPI  VIO_BOOL alloc_checking_enabled( void );
@@ -646,6 +647,7 @@ VIOAPI  void  output_alloc_to_file(
 VIOAPI  void  print_alloc_source_line(
     VIO_STR  filename,
     int     line_number );
+#endif
 
 VIOAPI  void  set_array_size(
     void      **array,
@@ -1926,6 +1928,13 @@ VIOAPI  void  set_volume_type2(
     VIO_Real     voxel_min,
     VIO_Real     voxel_max );
 
+VIOAPI  void  set_volume_labels(
+    VIO_Volume   volume,
+    VIO_BOOL     is_labels );
+
+VIOAPI  VIO_BOOL  get_volume_labels(
+    VIO_Volume   volume );
+
 VIOAPI  nc_type  get_volume_nc_data_type(
     VIO_Volume   volume,
     VIO_BOOL     *signed_flag );
@@ -1969,7 +1978,7 @@ VIOAPI  void  set_volume_sizes(
     VIO_Volume   volume,
     int          sizes[] );
 
-VIOAPI  unsigned int  get_volume_total_n_voxels(
+VIOAPI  size_t  get_volume_total_n_voxels(
     VIO_Volume    volume );
 
 VIOAPI  void  compute_world_transform(
@@ -2173,6 +2182,9 @@ VIOAPI  VIO_Volume   copy_volume_definition(
 
 VIOAPI  VIO_Volume  copy_volume(
     VIO_Volume   volume );
+
+VIOAPI  VIO_Volume  copy_volume_new_type(
+    VIO_Volume volume, nc_type nc_data_type, VIO_BOOL signed_flag );
 
 VIOAPI  VIO_Status  grid_transform_point(
     VIO_General_transform   *transform,

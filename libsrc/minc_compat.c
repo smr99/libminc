@@ -50,11 +50,11 @@ MI2attinq(int fd, int varid, const char *attnm, nc_type *type_ptr,
     }
     else {
         int status;
-        int oldncopts = ncopts;
-        ncopts = 0;
+        int oldncopts =get_ncopts();
+        set_ncopts(0);
         status = ncattinq(fd, varid, attnm, type_ptr, length_ptr);
 
-        ncopts = oldncopts;
+        set_ncopts(oldncopts);
         if (status != 1 && oldncopts != 0) {
             fprintf(stderr,
                     _("ncattinq: ncid %d: varid: %d: Attribute '%s' not found"),
@@ -161,11 +161,11 @@ MI2attput(int fd, int varid, const char *attnm, nc_type val_typ,
         return (hdf_attput(fd, varid, attnm, val_typ, val_len, val_ptr));
     }
     else {
-        int old_ncopts = ncopts;
+        int old_ncopts =get_ncopts();
         int result;
-        ncopts = 0;
+        set_ncopts(0);
         result = ncattput(fd, varid, attnm, val_typ, val_len, val_ptr);
-        ncopts = old_ncopts;
+        set_ncopts(old_ncopts);
         return (result);
     }
 }
@@ -358,14 +358,9 @@ MI2redef(int fd)
 MNCAPI int
 MI2sync(int fd)
 {
-    if (MI2_ISH5OBJ(fd)) {
+    if (MI2_ISH5OBJ(fd) ) {
         /* Commit the (entire) file to disk. */
-        if (H5Fflush(fd, H5F_SCOPE_GLOBAL) < 0) {
-            return (MI_ERROR);
-        }
-        else {
-            return (MI_NOERROR);
-        }
+        return hdf_flush(fd);
     }
     else {
         return (ncsync(fd));

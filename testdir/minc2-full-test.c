@@ -1,14 +1,16 @@
 /* A test program to evaluate some of the MINC2 API's and features.
  */
 #include <stdio.h>
+#include <string.h>
 #include "minc2.h"
+#include "minc2_private.h"
 
 #define ND 3
-#define CX 100
-#define CY 100
-#define CZ 100
+#define CX 20
+#define CY 20
+#define CZ 20
 
-static int test1(int do_real)
+int test1(int do_real)
 {
     int i, j, k;
     int r;
@@ -17,6 +19,8 @@ static int test1(int do_real)
     mihandle_t hvol;
     double offsets[CX];
     misize_t coords[ND];
+    char temp1[128];
+    char temp2[128];
 
     for (i = 0; i < CX; i++) {
         offsets[i] = (double) i * (double) i;
@@ -129,6 +133,19 @@ static int test1(int do_real)
         return (1);
     }
 
+    miset_attr_values(hvol, MI_TYPE_STRING, MIimage, MIcomplete,
+                      sizeof(MI_TRUE), MI_TRUE);
+
+    miget_attr_values(hvol, MI_TYPE_STRING, MIimage, MIcomplete,
+                      sizeof(temp1), temp1);
+
+    miget_attribute(hvol, "/minc-2.0/image/0/image", MIcomplete,
+                    MI_TYPE_STRING, sizeof(temp2), temp2);
+
+    if (strcmp(temp1, "true_") || strcmp(temp2, "true_")) {
+      return (1);
+    }
+
     r = miclose_volume(hvol);
     if (r < 0) {
         return (1);
@@ -141,7 +158,7 @@ static int test1(int do_real)
 #define CCY 20
 #define CCZ 20
 
-static int test2()
+int test2(void)
 {
     midimhandle_t hdim[ND];
     mihandle_t hvol;
@@ -251,6 +268,9 @@ static int test2()
         }
     }
 
+    miset_attr_values(hvol, MI_TYPE_STRING, MIimage, MIcomplete, 
+                      sizeof(MI_TRUE), MI_TRUE);
+
     r = miclose_volume(hvol);
     if (r < 0) {
         return (1);
@@ -263,22 +283,10 @@ int
 main(int argc, char **argv)
 {
     int errors;
-    int do_real = 0;
-
-    while (--argc > 0) {
-        char *argp = *++argv;
-        if (*argp == '-') {
-            argp++;
-            switch (*argp) {
-            case 'r':
-                do_real = 1;
-                break;
-            }
-        }
-    }
 
     errors = 0;
-    errors += test1(do_real);
+    errors += test1(0);
+    errors += test1(1);
     errors += test2();
 
     if (errors == 0) {
@@ -290,3 +298,4 @@ main(int argc, char **argv)
     return (errors);
 }
 
+/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; */

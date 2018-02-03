@@ -65,6 +65,16 @@
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
+#include <stdio.h>
+
+// MS Visual Studio 12 and below.
+// Defined after include of `stdio.h` in case it is already defined in that
+// header file.
+#if defined(_MSC_VER) && _MSC_VER <= 1800
+#ifndef snprintf
+#define snprintf _snprintf
+#endif
+#endif
 
 #include <time.h>
 #include <time_stamp.h>
@@ -102,6 +112,8 @@ char *time_stamp(int argc, char *argv[])
    length=strlen(the_time) + strlen(separator) + 2;
    for(i=0; i<argc; i++) {
       length += strlen(argv[i]) + 1;
+      if (strchr(argv[i], ' ') != NULL)
+        length += 2;            /* we will need quotes! */
    }
    str = malloc(length);
 
@@ -115,7 +127,12 @@ char *time_stamp(int argc, char *argv[])
       last = strlen(str);
       str[last]=' ';
       str[last+1]='\0';
-      (void) strcat(str, argv[i]);
+      if (strchr(argv[i], ' ') != NULL) {
+        (void) snprintf(&str[last+1], length - (last + 1), "\"%s\"", argv[i]);
+      }
+      else {
+        (void) strcat(str, argv[i]);
+      }
    }
 
    /* Add a terminating newline */

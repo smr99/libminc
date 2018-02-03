@@ -20,6 +20,32 @@
 #define MIRW_OP_READ 1
 #define MIRW_OP_WRITE 2
 
+#ifndef HAVE_COPYSIGN
+double
+copysign(double x, double y)
+{
+    /* use atan2 to distinguish -0. from 0. */
+    if (y > 0. || (y == 0. && atan2(y, -1.) > 0.)) {
+        return fabs(x);
+    } else {
+        return -fabs(x);
+    }
+}
+#endif /* HAVE_COPYSIGN */
+
+#ifndef HAVE_ROUND
+double
+round(double x)
+{
+    double absx, y;
+    absx = fabs(x);
+    y = floor(absx);
+    if (absx - y >= 0.5)
+    y += 1.0;
+    return copysign(y, x);
+}
+#endif /* HAVE_ROUND */
+
 /** Calculates and returns the number of bytes required to store the
  * hyperslab specified by the \a n_dimensions and the
  * \a count parameters, using hdf type id
@@ -186,11 +212,6 @@ static int mirw_hyperslab_raw(int opcode,
     goto cleanup;
   }
 
-  MI_CHECK_HDF_CALL(fspc_id = H5Dget_space(dset_id),"H5Dget_space");
-  if (fspc_id < 0) {
-    goto cleanup;
-  }
-
   if (midatatype == MI_TYPE_UNKNOWN) {
     type_id = H5Tcopy(volume->mtype_id);
   } else {
@@ -314,9 +335,9 @@ cleanup:
       for(_j=0;_j<image_slice_length;_j++)\
       {\
         double _temp;\
-        _temp=*_buffer;\
-        _temp= _temp*_scale  + _offset ; \
-        *_buffer =(type_in)(_temp); \
+        _temp=(double)*_buffer;\
+        _temp=_temp*_scale  + _offset ; \
+        *_buffer=(type_in)(_temp); \
         _buffer++;\
       }\
     }\
@@ -536,6 +557,7 @@ static int mirw_hyperslab_icv(int opcode,
     }
     H5Sclose(scaling_mspc_id);
     H5Sclose(image_max_fspc_id);
+    H5Sclose(image_min_fspc_id);
   } else {
     slice_ndims=0;
     total_number_of_slices=1;
@@ -775,7 +797,7 @@ cleanup:
     hsize_t _i,_j;\
     double voxel_offset=voxel_min;\
     double voxel_range=voxel_max-voxel_min;\
-    double norm_offset=norm_min;\
+    double norm_offset=(double)norm_min;\
     double norm_range=(double)norm_max-(double)norm_min;\
     double data_offset=data_min;\
     double data_range=(double)data_max-(double)data_min;\
@@ -1236,8 +1258,8 @@ int miget_hyperslab_with_icv(mihandle_t volume,           /**< A MINC 2.0 volume
  */
 int miset_hyperslab_with_icv(mihandle_t volume,        /**< A MINC 2.0 volume handle */
                          mitype_t buffer_data_type,    /**< Output datatype */
-                         const misize_t start[],  /**< Start coordinates  */
-                         const misize_t count[],  /**< Lengths of edges  */
+                         const misize_t start[],       /**< Start coordinates  */
+                         const misize_t count[],       /**< Lengths of edges  */
                          void *buffer)                 /**< Output memory buffer */
 {
   return  mirw_hyperslab_icv(MIRW_OP_WRITE,volume,buffer_data_type,start,count,buffer);
@@ -1308,4 +1330,4 @@ int miset_voxel_value_hyperslab(mihandle_t volume,
                             start, count, (void *) buffer);
 }
 
-// kate: indent-mode cstyle; indent-width 2; replace-tabs on; 
+/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; */

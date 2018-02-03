@@ -14,6 +14,7 @@
 
 #cmakedefine HAVE_MINC1 1 
 #cmakedefine HAVE_MINC2 1
+#cmakedefine LIBMINC_NIFTI_SUPPORT 1
 
 #ifndef H5Acreate_vers
 #define H5Acreate_vers 2
@@ -22,6 +23,9 @@
 #cmakedefine HAVE_MKSTEMP 1 
 #cmakedefine HAVE_STRERROR 1 
 #cmakedefine HAVE_FLOAT_H 1 
+
+#cmakedefine HAVE_COPYSIGN 1 
+#cmakedefine HAVE_ROUND 1 
 
 #cmakedefine HAVE_DIRENT_H 1 
 #cmakedefine HAVE_DLFCN_H 1 
@@ -46,8 +50,10 @@
 #cmakedefine HAVE_SYS_NDIR_H 1 
 #cmakedefine HAVE_SYS_STAT_H 1 
 #cmakedefine HAVE_SYS_TIME_H 1 
+#cmakedefine HAVE_TIME_H 1 
 #cmakedefine HAVE_SYS_TYPES_H 1 
 #cmakedefine HAVE_SYS_WAIT_H 1 
+#cmakedefine HAVE_SYS_SELECT_H 1
 #cmakedefine HAVE_TEMPNAM 1 
 #cmakedefine HAVE_TMPNAM 1 
 #cmakedefine HAVE_UNISTD_H 1 
@@ -64,3 +70,5 @@
 #cmakedefine HAVE_SLEEP 1 
 #cmakedefine HAVE_CLOCK_GETTIME 1
 #cmakedefine HAVE_GETTIMEOFDAY 1
+#cmakedefine HAVE_RINT 1
+

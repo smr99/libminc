@@ -174,6 +174,8 @@
 #include <netcdf.h>
 #endif
 
+#include <minc_common_defs.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
@@ -537,6 +539,13 @@ MNCAPI int micopy_all_var_values(int incdfid, int outcdfid, int nexclude,
                                  int excluded_vars[]);
 MNCAPI char *micreate_tempfile(void);
 
+MNCAPI int set_ncopts(int new_ncopts);
+MNCAPI int get_ncopts(void);
+
+MNCAPI int push_ncopts(int new_ncopts);
+MNCAPI int pop_ncopts(void);
+
+
 /* From minc_convenience.c */
 MNCAPI int miget_datatype(int cdfid, int imgid, 
                           nc_type *datatype, int *is_signed);
@@ -621,7 +630,13 @@ struct mi2opts {
     int checksum;
 };
 
-#define MI2_ISH5OBJ(x) (H5Iget_type(x) > 0)
+/* This is hackish in that it assumes that all NetCDF handles returned
+ * by ncopen/nccreate will be small integers. Historically this is
+ * true, but it could break someday. We used to use an HDF5 call, but
+ * that broke when HDF5 switched from 32 to 64 bits for hid_t.
+ */
+#define HDF5_ID_MIN 0x30000000
+#define MI2_ISH5OBJ(x) (x >= HDF5_ID_MIN)
 
 MNCAPI int micreatex(const char *path, int cmode, struct mi2opts *opts_ptr);
 

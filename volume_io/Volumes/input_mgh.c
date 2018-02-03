@@ -8,7 +8,12 @@
 
 #include "input_mgh.h"
 
-#include <arpa/inet.h> /* for ntohl and ntohs */
+#ifdef _WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  include <Winsock2.h>
+#else
+#  include <arpa/inet.h> /* for ntohl and ntohs */
+#endif
 #include "znzlib.h"
 #include "errno.h"
 
@@ -520,7 +525,7 @@ initialize_mgh_format_input(VIO_STR             filename,
    */
   in_ptr->axis_index_from_file[3] = 3;
 
-  mgh_header_to_linear_transform(&hdr, in_ptr, FALSE, &mnc_native_xform);
+  mgh_header_to_linear_transform(&hdr, in_ptr, TRUE, &mnc_native_xform);
 
   convert_transform_to_starts_and_steps(&mnc_native_xform,
                                         VIO_N_DIMENSIONS,
@@ -577,8 +582,8 @@ initialize_mgh_format_input(VIO_STR             filename,
   n_voxels_in_slice = (in_ptr->sizes_in_file[0] *
                        in_ptr->sizes_in_file[1]);
 
-  in_ptr->min_value = FLT_MAX;
-  in_ptr->max_value = -FLT_MAX;
+  in_ptr->min_value = DBL_MAX;
+  in_ptr->max_value = -DBL_MAX;
 
   /* Allocate the slice buffer. */
 
@@ -659,6 +664,10 @@ input_more_mgh_format_file(
     }
 
     status = input_next_slice( in_ptr );
+    if ( status != VIO_OK )
+    {
+        return FALSE;
+    }
 
     /* See if we need to apply scaling to this slice. This is only
      * needed if the volume voxel type is not the same as the file

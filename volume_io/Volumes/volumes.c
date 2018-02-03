@@ -177,6 +177,7 @@ VIOAPI   VIO_Volume   create_volume(
     volume->real_range_set = FALSE;
     volume->real_value_scale = 1.0;
     volume->real_value_translation = 0.0;
+    volume->is_labels = FALSE;
 
     for_less( i, 0, VIO_N_DIMENSIONS )
         volume->spatial_axes[i] = -1;
@@ -293,7 +294,7 @@ VIOAPI  void  set_volume_type(
 
 
 /* ----------------------------- MNI Header -----------------------------------
-@NAME       : set_volume_type
+@NAME       : set_volume_type2
 @INPUT      : volume
               minc2_data_type
               voxel_min
@@ -366,6 +367,46 @@ VIOAPI  void  set_volume_type2(
         set_volume_voxel_range( volume, voxel_min, voxel_max );
     }
 }
+
+/* ----------------------------- MNI Header -----------------------------------
+@NAME       : set_volume_labels
+@INPUT      : volume
+              is_labels
+@OUTPUT     : 
+@RETURNS    : 
+@DESCRIPTION: Sets the data type flag to specify that volume contains discrete labels
+@METHOD     : 
+@GLOBALS    : 
+@CALLS      : 
+@CREATED    : 2013            Vladimir FONOV
+@MODIFIED   : 
+---------------------------------------------------------------------------- */
+VIOAPI  void  set_volume_labels(
+    VIO_Volume   volume,
+    VIO_BOOL     is_labels )
+{
+    volume->is_labels=is_labels;
+    /*TODO: add sanity check for floating point volumes (?)*/
+}
+
+/* ----------------------------- MNI Header -----------------------------------
+@NAME       : set_volume_labels
+@INPUT      : volume
+@OUTPUT     : is_labels
+@RETURNS    : 
+@DESCRIPTION: Gets the data type flag specifying that volume contains discrete labels 
+@METHOD     : 
+@GLOBALS    : 
+@CALLS      : 
+@CREATED    : 2013            Vladimir FONOV
+@MODIFIED   : 
+---------------------------------------------------------------------------- */
+VIOAPI  VIO_BOOL  get_volume_labels(
+    VIO_Volume   volume )
+{
+  return volume->is_labels;
+}
+
 
 
 VIOAPI mitype_t nc_type_to_minc2_type(
@@ -697,7 +738,13 @@ VIOAPI  VIO_BOOL  set_volume_n_dimensions(
 {
   if ( volume != NULL )
   {
-    return set_multidim_n_dimensions( &volume->array, n_dimensions );
+      /* avoid leak by deleting excess dimensions */
+      int i;
+      for_less(i, n_dimensions, get_multidim_n_dimensions( &volume->array ))
+      {
+          FREE( volume->dimension_names[i] );
+      }
+      return set_multidim_n_dimensions( &volume->array, n_dimensions );
   }
   return FALSE;
 }
@@ -779,10 +826,10 @@ VIOAPI  void  set_volume_sizes(
 @MODIFIED   : 
 ---------------------------------------------------------------------------- */
 
-VIOAPI  unsigned int  get_volume_total_n_voxels(
+VIOAPI  size_t  get_volume_total_n_voxels(
     VIO_Volume    volume )
 {
-    unsigned  int  n;
+    size_t    n;
     int       i, sizes[VIO_MAX_DIMENSIONS];
 
     n = 1;
@@ -790,7 +837,7 @@ VIOAPI  unsigned int  get_volume_total_n_voxels(
     get_volume_sizes( volume, sizes );
 
     for_less( i, 0, get_volume_n_dimensions( volume ) )
-        n *= (unsigned int) sizes[i];
+        n *= (size_t) sizes[i];
 
     return( n );
 }
@@ -2311,6 +2358,9 @@ VIOAPI  void  set_volume_voxel_range(
     VIO_Real  real_min = 0.0;
     VIO_Real  real_max = 0.0;
 
+    if( volume->real_range_set )
+        get_volume_real_range( volume, &real_min, &real_max );
+    
     if( voxel_min >= voxel_max ) /*VF: trying to fix the situation when whole volume have the same value all around*/
     {
         switch( get_volume_data_type( volume ) )
@@ -2342,9 +2392,6 @@ VIOAPI  void  set_volume_voxel_range(
             voxel_max = (VIO_Real) DBL_MAX;       break;
         }
     }
-
-    if( volume->real_range_set )
-        get_volume_real_range( volume, &real_min, &real_max );
 
     volume->voxel_min = voxel_min;
     volume->voxel_max = voxel_max;
@@ -2458,7 +2505,8 @@ VIOAPI  void  set_volume_real_range(
     VIO_Real    voxel_min, voxel_max;
 
     if( get_volume_data_type(volume) == VIO_FLOAT ||
-        get_volume_data_type(volume) == VIO_DOUBLE )
+        get_volume_data_type(volume) == VIO_DOUBLE ||
+        volume->is_labels )
     {
         /* as float and double use the voxel range */
         volume->real_range_set = FALSE;
@@ -2495,11 +2543,10 @@ VIOAPI  void  set_volume_real_range(
         }
         else
         {
-	    // FIXME: is scale = 0 correct??
+            /* FIXME: is scale = 0 correct??*/
             volume->real_value_scale = 0.0;
             volume->real_value_translation = real_min;
         }
-
         volume->real_range_set = TRUE;
     }
 
@@ -2652,9 +2699,21 @@ VIOAPI  VIO_Volume   copy_volume_definition(
 VIOAPI  VIO_Volume  copy_volume(
     VIO_Volume   volume )
 {
-    VIO_Volume   copy;
-    void     *src = NULL, *dest = NULL;
-    int      d, n_voxels, sizes[VIO_MAX_DIMENSIONS];
+    return copy_volume_new_type( volume, MI_ORIGINAL_TYPE, FALSE );
+}
+
+VIOAPI  VIO_Volume  copy_volume_new_type(
+    VIO_Volume volume,  
+    nc_type    new_data_type,
+    VIO_BOOL   new_signed_flag)
+{
+    VIO_Volume copy;
+    void       *src = NULL;
+    void       *dst = NULL;
+    size_t     n_voxels;
+    nc_type    old_data_type;
+    VIO_BOOL   old_signed_flag;
+    VIO_Real   min_voxel, max_voxel;
 
     if( volume->is_cached_volume )
     {
@@ -2664,29 +2723,140 @@ VIOAPI  VIO_Volume  copy_volume(
         return( NULL );
     }
 
-    copy = copy_volume_definition( volume, MI_ORIGINAL_TYPE, FALSE, 0.0, 0.0 );
-    if( !copy ) {
-      return( NULL );
+    get_volume_voxel_range( volume, &min_voxel, &max_voxel );
+    copy = copy_volume_definition_no_alloc( volume,
+                                            new_data_type, new_signed_flag,
+                                            min_voxel, max_voxel );
+    if( copy == NULL )
+    {
+        return( NULL );
     }
 
     /* --- find out how many voxels are in the volume */
 
-    get_volume_sizes( volume, sizes );
-    n_voxels = 1;
-    for_less( d, 0, get_volume_n_dimensions(volume) )
-        n_voxels *= sizes[d];
+    n_voxels = get_volume_total_n_voxels( volume );
 
     /* --- get a pointer to the beginning of the voxels */
 
+    if (!volume_is_alloced( volume ))
+        return copy;
+
+    alloc_volume_data( copy );
+
     GET_VOXEL_PTR( src, volume, 0, 0, 0, 0, 0 );
-    GET_VOXEL_PTR( dest, copy, 0, 0, 0, 0, 0 );
+    GET_VOXEL_PTR( dst, copy, 0, 0, 0, 0, 0 );
 
     /* --- assuming voxels are contiguous, copy them in one chunk */
 
-    (void) memcpy( dest, src, (size_t) n_voxels *
-                              (size_t) get_type_size(
-                                         get_volume_data_type(volume)) );
+    old_data_type = get_volume_nc_data_type( volume, &old_signed_flag);
 
+    if (new_data_type == MI_ORIGINAL_TYPE || new_data_type == old_data_type)
+    {
+        /* We can safely ignore the signed_flag here, it doesn't matter whether
+         * we copy the data as two's complement or unsigned.
+         */
+        (void) memcpy( dst, src, (size_t) n_voxels *
+                       (size_t) get_type_size( get_volume_data_type(volume)) );
+    }
+    else
+    {
+      size_t i = n_voxels;
+      double value;
+
+      while (i-- != 0)
+      {
+        switch (old_data_type)
+        {
+        case NC_BYTE:
+            if (old_signed_flag)
+            {
+                value = ((signed char *) src)[i];
+            }
+            else
+            {
+                value = ((unsigned char *) src)[i];
+            }
+            break;
+        case NC_SHORT:
+            if (old_signed_flag)
+            {
+                value = ((signed short *) src)[i];
+            }
+            else
+            {
+                value = ((unsigned short *) src)[i];
+            }
+            break;
+        case NC_INT:
+            if (old_signed_flag)
+            {
+                value = ((signed int *) src)[i];
+            }
+            else
+            {
+                value = ((unsigned int *) src)[i];
+            }
+            break;
+        case NC_FLOAT:
+            value = ((float *) src)[i];
+            break;
+
+        case NC_DOUBLE:
+            value = ((double *) src)[i];
+            break;
+
+        default:
+            print_error("Unhandled type code: %d.\n", old_data_type);
+            delete_volume( copy );
+            return NULL;
+        }
+
+        switch (new_data_type)
+        {
+        case NC_BYTE:
+            if (new_signed_flag)
+            {
+                ((signed char *) dst)[i] = value;
+            }
+            else
+            {
+                ((unsigned char *) dst)[i] = value;
+            }
+            break;
+        case NC_SHORT:
+            if (new_signed_flag)
+            {
+                ((signed short *) dst)[i] = value;
+            }
+            else
+            {
+                ((unsigned short *) dst)[i] = value;
+            }
+            break;
+        case NC_INT:
+            if (new_signed_flag)
+            {
+                ((signed int *) dst)[i] = value;
+            }
+            else
+            {
+                ((unsigned int *) dst)[i] = value;
+            }
+            break;
+        case NC_FLOAT:
+            ((float *) dst)[i] = value;
+            break;
+        case NC_DOUBLE:
+            ((double *) dst)[i] = value;
+            break;
+
+        default:
+            print_error("Unhandled type code: %d.\n", new_data_type);
+            delete_volume( copy );
+            return NULL;
+        }
+      }
+    }
     return( copy );
 }
 

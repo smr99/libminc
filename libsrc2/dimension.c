@@ -17,6 +17,12 @@
 #include "minc2.h"
 #include "minc2_private.h"
 
+#include <math.h>
+
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif /*HAVE_STRING_H*/
+
 /**
   Figure out whether a dimension is associated with a volume.
   \param dimension The dimension handle.
@@ -114,11 +120,15 @@ int micopy_dimension ( midimhandle_t dim_ptr, midimhandle_t *new_dim_ptr )
 
   //check to make sure string is not empty or null
   if ( dim_ptr->units == NULL  || *dim_ptr->units == '\0' ) {
-    handle->units = strdup ( "mm" );
+    if (dim_ptr->dim_class == MI_DIMCLASS_TIME)
+      handle->units = strdup("s");
+    else
+      handle->units = strdup ( "mm" );
   } else {
     handle->units = strdup ( dim_ptr->units );
   }
 
+  handle->align = dim_ptr->align;
   handle->width = dim_ptr->width;
 
   if ( dim_ptr->widths != NULL ) {
@@ -304,7 +314,15 @@ int micreate_dimension(const char *name, midimclass_t dimclass, midimattr_t attr
   }
 
   handle->length = length;
-  handle->units = strdup ( "mm" );
+
+  if (dimclass == MI_DIMCLASS_TIME) {
+    handle->align = MI_DIMALIGN_START;
+    handle->units = strdup( "s" );
+  }
+  else {
+    handle->align = MI_DIMALIGN_CENTRE;
+    handle->units = strdup ( "mm" );
+  }
   /* volume_handle is the only NULL value once the dimension is created.
    */
   handle->volume_handle = NULL;
@@ -1077,8 +1095,8 @@ int miset_dimension_offsets ( midimhandle_t dimension,
   * \param dimension The dimension handle.
   * \param sampling_flag The flag to determine regular/irregular sampling dimensions.
   *
-  * This flag is true (non-zero) if the dimension is sampled at regular
-  * intervals, and false if the dimension is sampled irregularly.
+  * This flag is false (zero) if the dimension is sampled at regular
+  * intervals, and true if the dimension is sampled irregularly.
   * If a dimension has regular sampling, the miget_dimension_separation()
   * may be used to retrieve the sampling interval, and the
   * miget_dimension_start() may be used to retrieve the origin
@@ -1545,7 +1563,7 @@ int miget_dimension_widths ( midimhandle_t dimension,
                          misize_t start_position,
                          double widths[] )
 {
-  unsigned long  diff;
+  misize_t end_position;
   misize_t i, j = 0;
 
   if ( dimension == NULL || start_position > dimension->length ) {
@@ -1553,38 +1571,37 @@ int miget_dimension_widths ( midimhandle_t dimension,
   }
 
   if ( ( start_position + array_length ) > dimension->length ) {
-    diff = dimension->length;
+    end_position = dimension->length;
   } else {
-    diff = array_length;
+    end_position = start_position + array_length;
   }
-
-  /* Allocate space for the widths array
-   TODO: This is suspicious, didn't we just pass a pointer to this array?
-   */
-  /* widths = ( double * ) malloc ( diff * sizeof ( double ) ); */
 
   /* Check to see whether the dimension is regularly sampled.
    */
-  if ( start_position == 0 ) {
-    diff--;
-  }
-
   if ( dimension->widths == NULL ) {
-    for ( i = start_position; i <= diff; i++ ) {
-      widths[j] = dimension->width;
-      j++;
+    if (dimension->width != 0) {
+      for ( i = start_position; i < end_position; i++ ) {
+        widths[j] = dimension->width;
+        j++;
+      }
+    }
+    else {
+      for ( i = start_position; i < end_position; i++ ) {
+        widths[j] = fabs(dimension->step);
+        j++;
+      }
     }
   } else {
     /* If the apparent order is requested, the widths are returned
        REVERSE (flip) order.
      */
     if ( voxel_order == 0 ) {
-      for ( i = start_position; i <= diff; i++ ) {
+      for ( i = start_position; i < end_position; i++ ) {
         widths[j] = dimension->widths[i];
         j++;
       }
     } else {
-      for ( i = diff; i >= start_position; i-- ) {
+      for ( i = end_position-1; i >= start_position; i-- ) {
         widths[j] = dimension->widths[i];
         j++;
       }
@@ -1611,8 +1628,8 @@ int miset_dimension_widths ( midimhandle_t dimension,
                          misize_t start_position,
                          const double widths[] )
 {
-  misize_t  diff;
-  misize_t i, j = 0;
+  misize_t end_position;
+  misize_t i, j;
 
   /* Check to see whether the dimension is regularly sampled.
    */
@@ -1623,9 +1640,9 @@ int miset_dimension_widths ( midimhandle_t dimension,
   }
 
   if ( ( start_position + array_length ) > dimension->length ) {
-    diff = dimension->length;
+    end_position = dimension->length;
   } else {
-    diff = array_length;
+    end_position = start_position + array_length;
   }
 
   /* Allocate space for widths array if not already done
@@ -1634,21 +1651,15 @@ int miset_dimension_widths ( midimhandle_t dimension,
     dimension->widths = ( double * ) malloc ( dimension->length * sizeof ( double ) );
   }
 
-  if ( start_position == 0 ) {
-    diff--;
-  }
-
-  for ( i = start_position; i <= diff; i++ ) {
-    if ( widths[i] < 0 ) {
+  for ( i = start_position, j = 0; i < end_position; i++, j++ ) {
+    if ( widths[j] < 0 ) { /* NOTE: is this test even useful? */
       dimension->widths[i] = -1 * widths[j];
     } else {
       dimension->widths[i] = widths[j];
     }
-
-    j++;
   }
 
   return ( MI_NOERROR );
 }
 
-// kate: indent-mode cstyle; indent-width 2; replace-tabs on; 
+/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; */

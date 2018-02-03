@@ -17,7 +17,8 @@
 #endif /*HAVE_CONFIG_H*/
 
 
-#include  <internal_volume_io.h>
+#include <internal_volume_io.h>
+#include <minc_config.h>
 
 #ifdef HAVE_MINC1
 
@@ -227,7 +228,7 @@ static void create_image_variable(Minc_file file)
 {
     int old_ncopts;
 
-    old_ncopts = ncopts;
+    old_ncopts =get_ncopts();
 
     /* Create the variable */
     file->img_var_id = micreate_std_variable( file->cdfid, MIimage,
@@ -238,14 +239,14 @@ static void create_image_variable(Minc_file file)
     /* Copy all attributes if required */
     if( file->src_img_var != MI_ERROR )
     {
-        ncopts = 0;
+        set_ncopts(0);
         (void) micopy_all_atts( file->src_cdfid, file->src_img_var,
                                 file->cdfid, file->img_var_id );
         (void) ncattdel( file->cdfid, file->img_var_id, MIvalid_max );
         (void) ncattdel( file->cdfid, file->img_var_id, MIvalid_min );
         (void) ncattdel( file->cdfid, file->img_var_id, MIvalid_range );
 
-        ncopts = old_ncopts;
+        set_ncopts(old_ncopts);
     }
 
     (void) miattputstr( file->cdfid, file->img_var_id, MIcomplete, MI_FALSE );
@@ -354,6 +355,7 @@ VIOAPI  Minc_file  initialize_minc_output(
     {
         set_default_minc_output_options( &default_options );
         options = &default_options;
+        options->is_labels=volume_to_attach->is_labels;
     }
 
     if( dim_names == NULL )
@@ -382,6 +384,15 @@ VIOAPI  Minc_file  initialize_minc_output(
     {
         get_volume_real_range( volume_to_attach,
                                &file_voxel_min, &file_voxel_max );
+    } 
+    else if( options->is_labels ) 
+    {
+        get_volume_real_range( volume_to_attach,
+                               &file_voxel_min, &file_voxel_max );
+        
+        options->global_image_range[0]=file_voxel_min;
+        options->global_image_range[1]=file_voxel_max;
+        
     }
 
     /* --- check if dimension name correspondence between volume and file */
@@ -405,6 +416,7 @@ VIOAPI  Minc_file  initialize_minc_output(
     file->entire_file_written = FALSE;
     file->ignoring_because_cached = FALSE;
     file->src_img_var = MI_ERROR;
+    file->using_minc2_api = FALSE;
 
     file->filename = expand_filename( filename );
 
@@ -415,7 +427,7 @@ VIOAPI  Minc_file  initialize_minc_output(
         file->ignoring_because_cached = TRUE;
 #ifdef HAVE_MINC1
         flush_volume_cache( volume_to_attach );
-#endif /*HAVE_MINC1*/        
+#endif /*HAVE_MINC1*/
         return( file );
     }
 
@@ -473,7 +485,7 @@ VIOAPI  Minc_file  initialize_minc_output(
 
     /*--- create the file */
 
-    ncopts = NC_VERBOSE;
+    set_ncopts(NC_VERBOSE);
 
     file->cdfid =  micreate( file->filename, NC_CLOBBER );
 
@@ -516,7 +528,7 @@ VIOAPI  Minc_file  initialize_minc_output(
     file->image_range[0] = options->global_image_range[0];
     file->image_range[1] = options->global_image_range[1];
 
-    if( file->image_range[0] < file->image_range[1] )
+    if( file->image_range[0] < file->image_range[1] || options->is_labels )
     {
         file->min_id = micreate_std_variable( file->cdfid, MIimagemin,
                                               NC_DOUBLE, 0, (int *) NULL );
@@ -537,7 +549,7 @@ VIOAPI  Minc_file  initialize_minc_output(
                                               file->image_dims );
     }
 
-    ncopts = NC_VERBOSE | NC_FATAL;
+    set_ncopts(NC_VERBOSE | NC_FATAL);
 
     file->end_def_done = FALSE;
     file->variables_written = FALSE;
@@ -573,7 +585,7 @@ VIOAPI  VIO_Status  copy_auxiliary_data_from_minc_file(
     if( file->ignoring_because_cached )
         return( VIO_OK );
 
-    ncopts = NC_VERBOSE;
+    set_ncopts(NC_VERBOSE);
 
     expanded = expand_filename( filename );
 
@@ -592,7 +604,7 @@ VIOAPI  VIO_Status  copy_auxiliary_data_from_minc_file(
 
     (void) miclose( src_cdfid );
 
-    ncopts = NC_VERBOSE | NC_FATAL;
+    set_ncopts(NC_VERBOSE | NC_FATAL);
 
     return( status );
 }
@@ -642,7 +654,7 @@ VIOAPI  VIO_Status  copy_auxiliary_data_from_open_minc_file(
         return( VIO_ERROR );
     }
 
-    ncopts = 0;
+    set_ncopts(0);
 
     n_excluded = 0;
 
@@ -661,7 +673,7 @@ VIOAPI  VIO_Status  copy_auxiliary_data_from_open_minc_file(
     if( (src_root_id = ncvarid(src_cdfid, MIrootvariable )) != MI_ERROR )
         excluded_vars[n_excluded++] = src_root_id;
 
-    ncopts = NC_VERBOSE;
+    set_ncopts(NC_VERBOSE);
 
     (void) micopy_all_var_defs( src_cdfid, file->cdfid, n_excluded,
                                 excluded_vars );
@@ -716,7 +728,7 @@ VIOAPI  VIO_Status  copy_auxiliary_data_from_open_minc_file(
                                       n_excluded, excluded_vars );
     }
 
-    ncopts = NC_VERBOSE | NC_FATAL;
+    set_ncopts(NC_VERBOSE | NC_FATAL);
 
     return( status );
 }
@@ -753,7 +765,7 @@ VIOAPI  VIO_Status  add_minc_history(
         return( VIO_ERROR );
     }
 
-    ncopts = 0;
+    set_ncopts(0);
 
     if( ncattinq(file->cdfid, NC_GLOBAL, MIhistory, &datatype, &old_att_length)
                                                           == MI_ERROR ||
@@ -784,7 +796,7 @@ VIOAPI  VIO_Status  add_minc_history(
 
     concat_to_string( &new_history, history_string );
 
-    ncopts = NC_VERBOSE | NC_FATAL;
+    set_ncopts(NC_VERBOSE | NC_FATAL);
     (void) miattputstr( file->cdfid, NC_GLOBAL, MIhistory, new_history );
 
     delete_string( new_history );
@@ -883,9 +895,9 @@ static  VIO_Status  check_minc_output_variables(
     {
         /* --- Get into data mode */
 
-        ncopts = NC_VERBOSE;
+        set_ncopts(NC_VERBOSE);
         status = end_file_def( file );
-        ncopts = NC_VERBOSE | NC_FATAL;
+        set_ncopts(NC_VERBOSE | NC_FATAL);
         file->end_def_done = TRUE;
 
         if( status != VIO_OK )
@@ -901,7 +913,7 @@ static  VIO_Status  check_minc_output_variables(
 
         file->variables_written = TRUE;
 
-        ncopts = NC_VERBOSE;
+        set_ncopts(NC_VERBOSE);
         for_less( d, 0, file->n_file_dimensions )
             mindex[d] = 0;
 
@@ -921,10 +933,16 @@ static  VIO_Status  check_minc_output_variables(
                              (int) volume->nc_data_type);
         (void) miicv_setstr( file->minc_icv, MI_ICV_SIGN,
                              volume->signed_flag ? MI_SIGNED : MI_UNSIGNED );
-        (void) miicv_setint( file->minc_icv, MI_ICV_DO_NORM, TRUE );
-        (void) miicv_setint( file->minc_icv, MI_ICV_USER_NORM, TRUE );
-
-        if( file->image_range[0] < file->image_range[1] )
+        if ( volume->is_labels )
+        {
+          (void) miicv_setint( file->minc_icv, MI_ICV_DO_NORM, FALSE );
+          (void) miicv_setint( file->minc_icv, MI_ICV_USER_NORM, FALSE );
+        } else {
+          (void) miicv_setint( file->minc_icv, MI_ICV_DO_NORM, TRUE );
+          (void) miicv_setint( file->minc_icv, MI_ICV_USER_NORM, TRUE );
+        }
+        
+        if( file->image_range[0] < file->image_range[1] || volume->is_labels)
         {
             (void) miicv_setdbl( file->minc_icv, MI_ICV_IMAGE_MIN,
                                  file->image_range[0] );
@@ -951,14 +969,14 @@ static  VIO_Status  check_minc_output_variables(
 
         start_index = 0;
 
-        if( file->image_range[0] < file->image_range[1] )
+        if( file->image_range[0] < file->image_range[1] || volume->is_labels )
         {
             (void) mivarput1( file->cdfid, file->min_id, &start_index,
                               NC_DOUBLE, MI_SIGNED, &file->image_range[0] );
             (void) mivarput1( file->cdfid, file->max_id, &start_index,
                               NC_DOUBLE, MI_SIGNED, &file->image_range[1] );
         }
-        ncopts = NC_VERBOSE | NC_FATAL;
+        set_ncopts(NC_VERBOSE | NC_FATAL);
     }
 
     return( VIO_OK );
@@ -1381,7 +1399,7 @@ static  VIO_Status  output_the_volume(
     /*--- if per slice image ranges, output the ranges corresponding to this
           volume */
 
-    if( file->image_range[0] >= file->image_range[1] )
+    if( file->image_range[0] >= file->image_range[1] && !volume->is_labels )
     {
         long     n_ranges, range_start[MAX_VAR_DIMS], range_count[MAX_VAR_DIMS];
         long     r;
@@ -1700,6 +1718,11 @@ VIOAPI  void  set_default_minc_output_options(
 
     options->use_volume_starts_and_steps = FALSE;
     options->use_starts_set = FALSE;
+    
+    options->is_labels  = FALSE;
+    
+    /*mostly for debugging*/
+    options->prefer_minc2_api=miget_cfg_bool(MICFG_MINC_PREFER_V2_API);
 }
 
 /* ----------------------------- MNI Header -----------------------------------
@@ -1733,6 +1756,8 @@ VIOAPI  void  copy_minc_output_options(
                 dest->dimension_names[dim] = create_string(
                                                   src->dimension_names[dim] );
         }
+        dest->is_labels=src->is_labels;
+        dest->prefer_minc2_api=src->prefer_minc2_api;
     }
 }
 
