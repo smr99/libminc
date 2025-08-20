@@ -46,7 +46,7 @@
  * A few fixes to the configure script.
  *
  * Revision 6.1  1999/10/19 14:45:09  neelin
- * Fixed Log subsitutions for CVS
+ * Fixed Log substitutions for CVS
  *
  * Revision 6.0  1997/09/12 13:24:54  neelin
  * Release of minc version 0.6
@@ -425,7 +425,7 @@ void MI2_log_pkg_error3 ( int p1, char *p2, char *p3 )
 
 void MI2_log_sys_error1 ( char *p1 )
 {
-  MI2_log_sys_error1(p1);
+  MI_log_sys_error1(p1);
 }
 
 

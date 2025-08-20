@@ -24,7 +24,7 @@
  * Fixed log message containing log substitution
  *
  * Revision 6.1  1999/10/19 14:45:14  neelin
- * Fixed Log subsitutions for CVS
+ * Fixed Log substitutions for CVS
  *
  * Revision 6.0  1997/09/12 13:23:41  neelin
  * Release of minc version 0.6
@@ -62,14 +62,12 @@
 #include "config.h"
 #endif /*HAVE_CONFIG_H*/
 
-#ifdef HAVE_STRING_H
 #include <string.h>
-#endif
 #include <stdio.h>
 
-// MS Visual Studio 12 and below.
-// Defined after include of `stdio.h` in case it is already defined in that
-// header file.
+/* MS Visual Studio 12 and below.
+   Defined after include of `stdio.h` in case it is already defined in that
+   header file. */
 #if defined(_MSC_VER) && _MSC_VER <= 1800
 #ifndef snprintf
 #define snprintf _snprintf

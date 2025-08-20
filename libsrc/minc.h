@@ -95,7 +95,7 @@
  * Start of modifications to get minc working with netcdf 3.5.
  *
  * Revision 6.1  1999/10/19 14:45:08  neelin
- * Fixed Log subsitutions for CVS
+ * Fixed Log substitutions for CVS
  *
  * Revision 6.0  1997/09/12 13:24:54  neelin
  * Release of minc version 0.6
@@ -603,8 +603,8 @@ extern int miget_file_type(const char *filename);
 
 #define MI2_GRPNAME "/minc-2.0"
 /* These must not interfere with any NC_ flags we might have to support. */
-#define MI2_CREATE_V2 0x1000    /* Force V2 format */
-#define MI2_CREATE_V1 0x2000    /* Force V1 format */
+#define MI2_CREATE_V2 0x10000    /* Force V2 format */
+#define MI2_CREATE_V1 0x20000    /* Force V1 format */
 
 /* Possible compression type values. */
 #define MI2_COMP_UNKNOWN (-1)

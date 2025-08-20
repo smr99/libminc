@@ -10,13 +10,13 @@
 #include "config.h"
 #endif /*HAVE_CONFIG_H*/
 
+#include <math.h>
+
 #include  <internal_volume_io.h>
 
 #include <stdio.h>
 
-#if HAVE_STRING_H
 #include <string.h>
-#endif
 
 #if HAVE_STRINGS_H
 #include <strings.h>

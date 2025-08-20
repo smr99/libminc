@@ -13,9 +13,12 @@
 #define MI2_LENGTH "length"
 #define MI2_CLASS "class"
 
-/* So we build with 1.8.4 */  
-#ifndef H5F_LIBVER_18
-#define H5F_LIBVER_18 H5F_LIBVER_LATEST
+/* Make 1.8.x compatible files if building with 1.10.x */  
+#if (H5_VERS_MAJOR==1)&&(H5_VERS_MINOR<10)
+#define H5F_LIBVER_V18 H5F_LIBVER_LATEST
+#elif (H5_VERS_MAJOR==1)&&(H5_VERS_MINOR==10)&&(H5_VERS_RELEASE<2)
+#error The selected version of HDF5 library does not support setting backwards compatibility at run-time.\
+  Please use a different version of HDF5
 #endif
 
 /************************************************************************
@@ -306,12 +309,12 @@ hdf_is_dimension_name(struct m2_file *file, const char *varnm)
  * may not yet exist in the file.
  */
 static hid_t
-hdf_path_from_name(struct m2_file *file, const char *varnm, char *varpath)
+hdf_path_from_name(struct m2_file *file, const char *varnm, char *varpath, size_t varpathlength)
 {
     if (!strcmp(varnm, MIimage) ||
       !strcmp(varnm, MIimagemax) ||
       !strcmp(varnm, MIimagemin)) {
-      sprintf(varpath, "/minc-2.0/image/%d/", file->resolution);
+      snprintf(varpath, varpathlength, "/minc-2.0/image/%d/", file->resolution);
     }
     else if (hdf_is_dimension_name(file, varnm)) {
       strcpy(varpath, "/minc-2.0/dimensions/");
@@ -1099,7 +1102,7 @@ hdf_attput(int fd, int varid, const char *attnm, nc_type val_typ,
             char temp[128];
             unsigned int i;
 
-            sprintf(temp, "junkXXXX");
+            snprintf(temp, sizeof(temp), "junkXXXX");
 
             new_type_id = H5Tcopy(var->ftyp_id);
             if (new_type_id < 0) {
@@ -1292,7 +1295,7 @@ hdf_vardef(int fd, const char *varnm, nc_type vartype, int ndims,
       return (MI_ERROR);
     }
 
-    if (hdf_path_from_name(file, varnm, varpath) < 0) {
+    if (hdf_path_from_name(file, varnm, varpath, sizeof(varpath)) < 0) {
       return (MI_ERROR);
     }
 
@@ -2218,6 +2221,8 @@ hdf_open(const char *path, int mode)
     
     /*Set cachine parameters*/
     fpid=H5Pcreate( H5P_FILE_ACCESS );
+    /* Limit file compatibility to 1.8.x */
+    H5Pset_libver_bounds (fpid, H5F_LIBVER_V18, H5F_LIBVER_V18);
     
     /*setup a bigger cache to work with typical chunking ( MI_MAX_VAR_BUFFER_SIZE )*/
     H5Pset_cache(fpid, 0, 2503, miget_cfg_present(MICFG_MINC_FILE_CACHE)?miget_cfg_int(MICFG_MINC_FILE_CACHE)*100000:MI_MAX_VAR_BUFFER_SIZE*10, 1.0);
@@ -2228,6 +2233,7 @@ hdf_open(const char *path, int mode)
             hid_t prp_id;
 
             prp_id = H5Pcreate(H5P_FILE_ACCESS);
+            H5Pset_libver_bounds (prp_id, H5F_LIBVER_V18, H5F_LIBVER_V18);
             H5Pset_fapl_mmap(prp_id, 8192, 1);
             file_id = H5Fopen(path, mode & 0x7FFF, prp_id);
             H5Pclose(prp_id);
@@ -2326,10 +2332,11 @@ hdf_create(const char *path, int cmode, struct mi2opts *opts_ptr)
 
     /*Set cachine parameters*/
     fpid = H5Pcreate (H5P_FILE_ACCESS);
+    /* Limit file compatibility to 1.8.x */
+    H5Pset_libver_bounds (fpid, H5F_LIBVER_V18, H5F_LIBVER_V18);
     
     /*setup a bigger cache to work with typical chunking ( MI_MAX_VAR_BUFFER_SIZE )*/
-    H5Pset_cache(fpid, 0, 2503, miget_cfg_present(MICFG_MINC_FILE_CACHE)?miget_cfg_int(MICFG_MINC_FILE_CACHE)*100000:MI_MAX_VAR_BUFFER_SIZE*10, 1.0);
-    
+    H5Pset_cache(fpid, 0, 2503, miget_cfg_present(MICFG_MINC_FILE_CACHE)?miget_cfg_int(MICFG_MINC_FILE_CACHE)*100000:MI_MAX_VAR_BUFFER_SIZE*10, 1.0);    
    
     /* Convert the MINC (NetCDF) mode to a HDF5 mode.
      */
@@ -2339,9 +2346,6 @@ hdf_create(const char *path, int cmode, struct mi2opts *opts_ptr)
     else {
       cmode = H5F_ACC_TRUNC;
     }
-
-    /*VF use all the features of new HDF5 1.8*/
-    H5Pset_libver_bounds (fpid, H5F_LIBVER_18, H5F_LIBVER_18);
 
     H5E_BEGIN_TRY {
         file_id = H5Fcreate(path, cmode, H5P_DEFAULT, fpid);

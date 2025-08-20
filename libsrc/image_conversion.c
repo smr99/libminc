@@ -100,7 +100,7 @@
  * A few fixes to the configure script.
  *
  * Revision 6.1  1999/10/19 14:45:07  neelin
- * Fixed Log subsitutions for CVS
+ * Fixed Log substitutions for CVS
  *
  * Revision 6.0  1997/09/12 13:24:54  neelin
  * Release of minc version 0.6
@@ -203,7 +203,7 @@ static mi_icv_type **minc_icv_list = NULL;
 @CREATED    : August 7, 1992 (Peter Neelin)
 @MODIFIED   : 
 ---------------------------------------------------------------------------- */
-MNCAPI int miicv_create()
+MNCAPI int miicv_create(void)
 {
    int new_icv;       /* Id of newly created icv */
    mi_icv_type *icvp;  /* Pointer to new icv structure */

@@ -12,16 +12,12 @@
 #include <unistd.h>
 #endif
 
-#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
-#endif
 
 #include <math.h>
 #include <minc.h>
 
-#ifdef HAVE_STRING_H
 #include <string.h>
-#endif 
 
 #ifndef TRUE
 #define TRUE 1
@@ -48,7 +44,7 @@ enum dimension_index { IZ, IY, IX, IV, N_DIM };
 #define IMAGE_MAX 1.0
 #define VOXEL_MIN 0.0
 #define VOXEL_MAX TVAL(NZ-1,NY-1,NX-1,NV-1)
-#define N_ELEMENTS (NZ*(NY+2)*NX*NV) /* NY+2 to accomodate stretching test */
+#define N_ELEMENTS (NZ*(NY+2)*NX*NV) /* NY+2 to accommodate stretching test */
 
 static int
 test_icv_vector(int cflag, nc_type voxel_type)

@@ -98,6 +98,14 @@ int miconvert_voxel_to_real(mihandle_t volume,
     double voxel_range, voxel_offset;
     double real_range, real_offset;
 
+    if( volume->volume_type==MI_TYPE_FLOAT    || volume->volume_type==MI_TYPE_DOUBLE ||
+      volume->volume_type==MI_TYPE_FCOMPLEX || volume->volume_type==MI_TYPE_DCOMPLEX ){
+      // If floating values voxel_value is the real value
+      *real_value_ptr = voxel_value;
+      return 0;
+    }
+
+
     /* get valid min/max, image min/max 
      */
     miget_volume_valid_range(volume, &valid_max, &valid_min);
@@ -510,7 +518,7 @@ int miset_voxel_value(mihandle_t volume,
 }
 
 
-int miget_volume_real_range(mihandle_t volume, double real_range[])
+int miget_volume_real_range(mihandle_t volume, double real_range[2])
 {
     hid_t spc_id;
     int n;

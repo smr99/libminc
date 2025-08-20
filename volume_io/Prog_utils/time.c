@@ -24,9 +24,7 @@
 # include <sys/time.h>
 #endif 
 
-#if HAVE_TIME_H
-# include <time.h>
-#endif
+#include <time.h>
 
 #if HAVE_UNISTD_H
 #include  <unistd.h>
@@ -202,7 +200,7 @@ VIOAPI  VIO_STR  format_time(
 
     if( negative )  seconds = -seconds;
 
-    (void) sprintf( buffer, format, seconds, units[i] );
+    (void) snprintf( buffer, sizeof(buffer), format, seconds, units[i] );
 
     return( create_string( buffer ) );
 }

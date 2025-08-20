@@ -231,7 +231,7 @@ ArgvInfo argTable[] = {
    {"-world_only", ARGV_CONSTANT, (char *)TRUE, (char *)&World_Only,
     "print CoM in world coords only."},
 
-   {NULL, ARGV_HELP, (char *)NULL, (char *)NULL, "\nHistogram Dependant Statistics:"},
+   {NULL, ARGV_HELP, (char *)NULL, (char *)NULL, "\nHistogram Dependent Statistics:"},
    {"-hist_count", ARGV_CONSTANT, (char *)TRUE, (char *)&Hist_Count,
     "# of voxels portrayed in Histogram."},
    {"-hist_percent",
@@ -755,7 +755,7 @@ int main(int argc, char *argv[])
             if(All || PctT) {
                char     str[100];
 
-               (void)sprintf(str, "PctT [%3d%%]:       ", (int)(pctT * 100));
+               (void)snprintf(str, sizeof(str), "PctT [%3d%%]:       ", (int)(pctT * 100));
                print_result(str, stats->pct_T);
             }
             if(All || Entropy) {
@@ -1323,7 +1323,7 @@ void verify_range_options(Double_Array * min, Double_Array * max,
 
 }
 
-/* Initialiaze a Stats_Info structure */
+/* Initialize a Stats_Info structure */
 void init_stats(Stats_Info * stats, int hist_bins)
 {
    stats->vol_range[0] = -DBL_MAX;

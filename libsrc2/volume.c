@@ -32,9 +32,12 @@
 #include "minc2.h"
 #include "minc2_private.h"
 
-/* So we build with 1.8.4 */  
-#ifndef H5F_LIBVER_18
-#define H5F_LIBVER_18 H5F_LIBVER_LATEST
+/* Build with 1.8.x support if using 1.10.x */ 
+#if (H5_VERS_MAJOR==1)&&(H5_VERS_MINOR<10)
+#define H5F_LIBVER_V18 H5F_LIBVER_LATEST
+#elif (H5_VERS_MAJOR==1)&&(H5_VERS_MINOR==10)&&(H5_VERS_RELEASE<2)
+#error The selected version of HDF5 library does not support setting backwards compatibility at run-time.\
+  Please use a different version of HDF5
 #endif
 
 /*Used to optimize chunking size for faster MINC1 API access*/
@@ -96,7 +99,7 @@ static int _generate_ident( char * id_str, size_t length )
 #endif
   strftime(time_str, sizeof(time_str), "%Y.%m.%d.%H.%M.%S", &tm_buf);
   
-  result = snprintf(id_str, length, "%s:%s:%s:%u:%u", 
+  result = snprintf(id_str, length, "%s:%s:%s:%u:%d", 
                     user_str, 
                     host_str, 
                     time_str, 
@@ -117,6 +120,7 @@ static hid_t _hdf_open(const char *path, int mode)
   int ndims;*/
   
   prp_id = H5Pcreate(H5P_FILE_ACCESS);
+  H5Pset_libver_bounds(prp_id, H5F_LIBVER_V18, H5F_LIBVER_V18);
   H5Pset_cache(prp_id, 0, 2503, miget_cfg_present(MICFG_MINC_FILE_CACHE)?miget_cfg_int(MICFG_MINC_FILE_CACHE)*100000:_MI1_MAX_VAR_BUFFER_SIZE*10, 1.0);
   
   H5E_BEGIN_TRY {
@@ -218,8 +222,8 @@ static hid_t _hdf_create(const char *path, int cmode)
   
   fpid = H5Pcreate (H5P_FILE_ACCESS);
 
-  /*VF use all the features of new HDF5 1.8*/
-  H5Pset_libver_bounds (fpid, H5F_LIBVER_18, H5F_LIBVER_18);
+  /* Limit filetype to 1.8.x */
+  H5Pset_libver_bounds(fpid, H5F_LIBVER_V18, H5F_LIBVER_V18);
   
   H5Pset_cache(fpid, 0, 2503, miget_cfg_present(MICFG_MINC_FILE_CACHE)?miget_cfg_int(MICFG_MINC_FILE_CACHE)*100000:_MI1_MAX_VAR_BUFFER_SIZE*100, 1.0);
   
@@ -277,7 +281,6 @@ int micreate_volume_image(mihandle_t volume)
 {
   char dimorder[MI2_CHAR_LENGTH];
   int i;
-  int dimorder_len=0;
   hid_t dataspace_id;
   hid_t dset_id;
   hsize_t hdf_size[MI2_MAX_VAR_DIMS];
@@ -607,8 +610,8 @@ int micreate_volume(const char *filename, int number_of_dimensions,
   */
   if (volume_class != MI_CLASS_LABEL &&
       volume_class != MI_CLASS_UNIFORM_RECORD) {
-    size_t siz = H5Tget_size(handle->ftype_id);
-    char *tmp = calloc(1, siz);
+    size_t size = H5Tget_size(handle->ftype_id);
+    char *tmp = calloc(1, size);
     H5Pset_fill_value(hdf_plist, handle->ftype_id, tmp);
     free(tmp);
   }
@@ -780,7 +783,7 @@ int micreate_volume(const char *filename, int number_of_dimensions,
         */
         miset_attr_at_loc(dataset_width, "length", MI_TYPE_INT,
                           1, &dimensions[i]->length);
-        /* Close the specified datatset */
+        /* Close the specified dataset */
         H5Dclose(dataset_width);
         free(name);
       }
@@ -1052,7 +1055,7 @@ int miget_volume_voxel_count(mihandle_t volume, misize_t *number_of_voxels)
   /* Quickest way to do this is with the dataspace identifier of the
   * volume. Use the volume's current resolution.
   */
-  sprintf(path, MI_ROOT_PATH "/image/%d/image", volume->selected_resolution);
+  snprintf(path, sizeof(path), MI_ROOT_PATH "/image/%d/image", volume->selected_resolution);
   /* Open the dataset with the specified path
   */
   MI_CHECK_HDF_CALL_RET(dset_id = H5Dopen1(volume->hdf_id, path),"H5Dopen1");
@@ -1162,7 +1165,7 @@ static int _miget_irregular_spacing(mihandle_t hvol, midimhandle_t hdim)
   char path[MI2_CHAR_LENGTH];
   hssize_t n_points;
 
-  sprintf(path, MI_ROOT_PATH "/dimensions/%s", hdim->name);
+  snprintf(path, sizeof(path),MI_ROOT_PATH "/dimensions/%s", hdim->name);
   MI_CHECK_HDF_CALL_RET(dset_id = H5Dopen1(hvol->hdf_id, path),"H5Dopen1");
   MI_CHECK_HDF_CALL_RET(dspc_id = H5Dget_space(dset_id), "H5Dget_space");
 
@@ -1180,13 +1183,13 @@ static int _miget_irregular_spacing(mihandle_t hvol, midimhandle_t hdim)
                                          hdim->offsets), "H5Dread")
         
   H5Dclose(dset_id);
-  sprintf(path, MI_ROOT_PATH "/dimensions/%s-width", hdim->name);
+  snprintf(path, sizeof(path),MI_ROOT_PATH "/dimensions/%s-width", hdim->name);
   dset_id = H5Dopen1(hvol->hdf_id, path);
   if (dset_id < 0) {
     /* Unfortunately, the emulation library in MINC1 puts this variable
      * in the wrong place.
      */
-    sprintf(path, MI_ROOT_PATH "/info/%s-width", hdim->name);
+    snprintf(path, sizeof(path), MI_ROOT_PATH "/info/%s-width", hdim->name);
     dset_id = H5Dopen1(hvol->hdf_id, path);
     if (dset_id < 0) {
       return 0;
@@ -1213,7 +1216,7 @@ static int _miget_file_dimension(mihandle_t volume, const char *dimname,
   unsigned int len;
 
   /* Create a path with the dimension name */
-  sprintf(path, MI_ROOT_PATH "/dimensions/%s", dimname);
+  snprintf(path, sizeof(path), MI_ROOT_PATH "/dimensions/%s", dimname);
   /* Allocate space for the dimension handle */
   hdim = (midimhandle_t) malloc(sizeof (*hdim));
   /* Initialize everything to zero */
@@ -1372,7 +1375,7 @@ int miopen_volume(const char *filename, int mode, mihandle_t *volume)
          {
            if( (file_id = _hdf_open(temp_file, hdf_mode) ) >0)
            {
-            unlink( temp_file ); /*file will be deleted immedeately after closing...*/
+            unlink( temp_file ); /*file will be deleted immediately after closing...*/
             free( temp_file );
            } else {
             unlink( temp_file );
@@ -1399,7 +1402,7 @@ int miopen_volume(const char *filename, int mode, mihandle_t *volume)
     return MI_LOG_ERROR(MI2_MSG_OPENFILE,filename);
 #endif    
   }
-  /* Set some varibales associated with the volume handle */
+  /* Set some variables associated with the volume handle */
   handle->hdf_id = file_id;
   handle->mode = mode;
 
@@ -1443,7 +1446,9 @@ int miopen_volume(const char *filename, int mode, mihandle_t *volume)
     }
     /* Get dimension variable attributes for each dimension */
     _miget_file_dimension(handle, p1, &handle->dim_handles[i]);
-    p1 = p2 + 1;
+    if (p2 != NULL) {
+      p1 = p2 + 1;
+    }
   }
 
   if( miset_volume_world_indices(handle) < 0 ) {

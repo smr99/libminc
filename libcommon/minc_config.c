@@ -5,24 +5,22 @@
 #include <stdio.h>
 #include <ctype.h>
 
-#ifdef HAVE_STRING_H
 #include <string.h>
-#endif
 
 #ifdef HAVE_STRINGS_H
 #include <strings.h>
 #endif
 
-
-#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
-#endif
 
 #include "minc_config.h"
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && _MSC_VER < 1900
 #define snprintf _snprintf 
 #define vsnprintf _vsnprintf 
+#endif
+
+#ifdef _MSC_VER
 #define strcasecmp _stricmp 
 #define strncasecmp _strnicmp 
 #endif

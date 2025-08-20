@@ -149,7 +149,7 @@ int miset_attribute(mihandle_t volume, const char *varpath,
 
 void miget_voxel_to_world(mihandle_t volume, mi_lin_xfm_t voxel_to_world);
 
-void minormalize_vector(double vector[]);
+void minormalize_vector(double vector[MI2_3D]);
 
 void mitransform_coord(double out_coord[],
                               mi_lin_xfm_t transform,
@@ -169,6 +169,7 @@ int minc_create_thumbnail(mihandle_t volume, int grp);
 int minc_update_thumbnail(mihandle_t volume, hid_t loc_id, int igrp, int ogrp);
 
 int minc_update_thumbnails(mihandle_t volume);
+
 
 int scaled_maximal_pivoting_gaussian_elimination(int   n,
                                                   int   row[],
@@ -210,9 +211,12 @@ void miinit_default_range(mitype_t mitype, double *valid_max, double *valid_min)
 double rint(double v);
 #endif
 
-#ifdef _MSC_VER
+#if  defined(_MSC_VER) && _MSC_VER < 1900
 #define snprintf _snprintf 
 #define vsnprintf _vsnprintf 
+#endif
+
+#ifdef _MSC_VER
 #define strcasecmp _stricmp 
 #define strncasecmp _strnicmp 
 #endif
